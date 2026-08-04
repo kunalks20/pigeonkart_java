@@ -1,0 +1,33 @@
+server:
+  # Railway (and most PaaS hosts) inject a PORT env var and route traffic to it —
+  # the app must bind to whatever value that is, not a fixed 8080.
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:pigeonkart}?currentSchema=pigeon_kart
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    properties:
+      hibernate:
+        default_schema: pigeon_kart
+    hibernate:
+      # No auto-DDL: Hibernate only maps to tables that already exist — it never
+      # creates, alters, or drops anything. Run dump.sql (see backend/sql/)
+      # against your database yourself before starting the app.
+      ddl-auto: none
+    show-sql: false
+
+# Get these from https://dashboard.razorpay.com/app/keys (use Test Mode keys first).
+# Never commit real keys — set them as environment variables instead.
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:rzp_test_placeholder}
+  key-secret: ${RAZORPAY_KEY_SECRET:placeholder_secret}
+  # When true and no real keys are set, payment endpoints auto-verify instead of
+  # calling Razorpay — lets you build/demo the flow before you have an account.
+  mock-mode: ${RAZORPAY_MOCK_MODE:true}
+
+cors:
+  allowed-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
