@@ -1,9 +1,15 @@
 package com.pigeonkart.api.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "products")
+@Setter
+@Getter
+@AllArgsConstructor
 public class Product {
 
     @Id
@@ -25,24 +31,6 @@ public class Product {
     protected Product() {
         // JPA
     }
-
-    public Product(Long id, String name, ProductCategory category, int price, int stock, String unit, String description) {
-        this.id = id;
-        this.name = name;
-        this.category = category;
-        this.price = price;
-        this.stock = stock;
-        this.unit = unit;
-        this.description = description;
-    }
-
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public ProductCategory getCategory() { return category; }
-    public int getPrice() { return price; }
-    public int getStock() { return stock; }
-    public String getUnit() { return unit; }
-    public String getDescription() { return description; }
 
     public void decreaseStock(int qty) {
         if (qty > this.stock) {

@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?currentSchema=pigeon_kart
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID}
+  key-secret: ${RAZORPAY_KEY_SECRET}
+  mock-mode: ${RAZORPAY_MOCK_MODE:true}
+
+cors:
+  allowed-origin: ${FRONTEND_ORIGIN}
+
+admin:
+  username: ${ADMIN_USERNAME}
+  password: ${ADMIN_PASSWORD}

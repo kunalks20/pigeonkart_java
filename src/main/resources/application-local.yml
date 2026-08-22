@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres?currentSchema=pigeon_kart
+    username: postgres
+    password: admin
+
+  jpa:
+    show-sql: true
+
+razorpay:
+  mock-mode: true
+
+cors:
+  allowed-origin: http://localhost:5173
