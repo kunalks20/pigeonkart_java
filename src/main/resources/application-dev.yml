@@ -7,7 +7,7 @@ spring:
 razorpay:
   key-id: ${RAZORPAY_KEY_ID}
   key-secret: ${RAZORPAY_KEY_SECRET}
-  mock-mode: ${RAZORPAY_MOCK_MODE:true}
+  mock-mode: ${RAZORPAY_MOCK_MODE}
 
 cors:
   allowed-origin: ${FRONTEND_ORIGIN}
