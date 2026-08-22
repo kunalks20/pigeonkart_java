@@ -7,6 +7,7 @@ import com.pigeonkart.api.model.OrderStatus;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.Utils;
+import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class PaymentService {
 
     private final OrderService orderService;
@@ -26,10 +28,6 @@ public class PaymentService {
 
     @Value("${razorpay.mock-mode}")
     private boolean mockMode;
-
-    public PaymentService(OrderService orderService) {
-        this.orderService = orderService;
-    }
 
     /**
      * Opens a Razorpay order for the given internal order id, restricted to UPI.
