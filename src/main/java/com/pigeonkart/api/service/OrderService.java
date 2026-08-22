@@ -14,6 +14,10 @@ import java.util.NoSuchElementException;
 @Service
 public class OrderService {
 
+    // Same ceiling enforced client-side (see CartContext.jsx) — kept here too
+    // since client-side limits are only a UX nicety, not real enforcement.
+    private static final int MAX_QTY_PER_ITEM = 10;
+
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
 
@@ -39,9 +43,17 @@ public class OrderService {
         for (OrderRequest.Item item : request.getItems()) {
             Product product = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new NoSuchElementException("Unknown product: " + item.getProductId()));
-            if (item.getQty() < 1 || item.getQty() > product.getStock()) {
-                throw new IllegalStateException("Requested quantity unavailable for " + product.getName());
+
+            if (item.getQty() < 1) {
+                throw new IllegalStateException("Invalid quantity for " + product.getName());
             }
+            if (item.getQty() > MAX_QTY_PER_ITEM) {
+                throw new IllegalStateException("Maximum " + MAX_QTY_PER_ITEM + " per item — reduce quantity for " + product.getName());
+            }
+            if (item.getQty() > product.getStock()) {
+                throw new IllegalStateException("Only " + product.getStock() + " left in stock for " + product.getName());
+            }
+
             order.addItem(new OrderItem(product.getId(), product.getName(), product.getPrice(), item.getQty()));
             total += product.getPrice() * item.getQty();
         }
