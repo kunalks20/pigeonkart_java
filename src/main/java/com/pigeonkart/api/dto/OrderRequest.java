@@ -19,6 +19,8 @@ public class OrderRequest {
     @NotEmpty
     private List<Item> items;
 
+    private String couponCode;
+
     @Getter
     public static class Customer {
         @NotBlank private String name;

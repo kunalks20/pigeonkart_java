@@ -34,7 +34,6 @@ public class AdminAuthService {
         }
         String token = UUID.randomUUID().toString();
         activeTokens.put(token, Instant.now().plus(TOKEN_TTL));
-        System.out.println("Token" + token);
         return token;
     }
 

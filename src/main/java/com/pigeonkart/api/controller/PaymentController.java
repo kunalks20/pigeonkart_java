@@ -16,7 +16,7 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @PostMapping("/order/{orderId}")
-    public PaymentOrderResponse createOrder(@PathVariable String orderId) throws Exception {
+    public PaymentOrderResponse createOrder(@PathVariable Long orderId) throws Exception {
         return paymentService.createPaymentOrder(orderId);
     }
 

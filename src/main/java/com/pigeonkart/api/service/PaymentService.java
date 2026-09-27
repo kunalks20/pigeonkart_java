@@ -34,7 +34,7 @@ public class PaymentService {
      * In mock mode (no real Razorpay account yet) this returns a fake order id
      * so the frontend flow can be built/demoed end to end.
      */
-    public PaymentOrderResponse createPaymentOrder(String orderId) throws Exception {
+    public PaymentOrderResponse createPaymentOrder(Long orderId) throws Exception {
         CustomerOrder order = orderService.getOrder(orderId);
         long amountInPaise = order.getTotalAmount() * 100L;
 

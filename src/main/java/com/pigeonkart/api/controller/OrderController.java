@@ -1,5 +1,7 @@
 package com.pigeonkart.api.controller;
 
+import com.pigeonkart.api.dto.CouponApplyRequest;
+import com.pigeonkart.api.dto.CouponResponse;
 import com.pigeonkart.api.dto.OrderRequest;
 import com.pigeonkart.api.dto.OrderResponse;
 import com.pigeonkart.api.model.CustomerOrder;
@@ -24,7 +26,12 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public OrderResponse get(@PathVariable String id) {
+    public OrderResponse get(@PathVariable Long id) {
         return new OrderResponse(orderService.getOrder(id));
+    }
+
+    @PostMapping("coupons/apply")
+    public CouponResponse apply(@Valid @RequestBody CouponApplyRequest request) {
+        return new CouponResponse(orderService.requireActiveCoupon(request.getCode()));
     }
 }

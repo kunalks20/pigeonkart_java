@@ -3,16 +3,12 @@ package com.pigeonkart.api.dto;
 import com.pigeonkart.api.model.CustomerOrder;
 import com.pigeonkart.api.model.OrderItem;
 import com.pigeonkart.api.model.OrderStatus;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Getter
-@Setter
 public class AdminOrderResponse {
     private Long id;
     private String customerName;
@@ -35,10 +31,9 @@ public class AdminOrderResponse {
         this.createdAt = order.getCreatedAt();
         this.items = order.getItems().stream()
                 .map(Item::new)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    @Getter
     public static class Item {
         private String productName;
         private int qty;

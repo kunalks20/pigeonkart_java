@@ -1,18 +1,19 @@
 package com.pigeonkart.api.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
 @Table(name = "products")
 @Setter
 @Getter
-@AllArgsConstructor
+@NoArgsConstructor
 public class Product {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String name;
@@ -28,9 +29,8 @@ public class Product {
 
     private String description;
 
-    protected Product() {
-        // JPA
-    }
+    @Column(name = "product_code")
+    private String productCode;
 
     public void decreaseStock(int qty) {
         if (qty > this.stock) {

@@ -29,6 +29,8 @@ public class CustomerOrder {
 
     private String razorpayOrderId;
     private String razorpayPaymentId;
+    private int subtotalAmount;
+    private int discountAmount;
 
     private Instant createdAt = Instant.now();
 
