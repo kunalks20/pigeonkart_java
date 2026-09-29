@@ -48,7 +48,7 @@ public class PaymentService {
         JSONObject options = new JSONObject();
         options.put("amount", amountInPaise);
         options.put("currency", "INR");
-        options.put("receipt", order.getId());
+        options.put("receipt", order.getId().toString());
         // Method restriction to UPI is applied on the frontend checkout config
         // (see method: { upi: true } in Checkout.jsx); Razorpay orders themselves
         // are method-agnostic.

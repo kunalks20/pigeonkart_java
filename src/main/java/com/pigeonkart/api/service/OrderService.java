@@ -25,7 +25,6 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final CouponRepo couponRepo;
-
     /**
      * Creates an order in PENDING_PAYMENT status. Stock is validated here but only
      * decremented once payment is verified (see PaymentService.verify), so an

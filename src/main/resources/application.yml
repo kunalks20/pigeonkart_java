@@ -9,11 +9,3 @@ server:
         default_schema: pigeon_kart
     hibernate:
       ddl-auto: none
-
-razorpay:
-  key-id: ${RAZORPAY_KEY_ID:rzp_test_placeholder}
-  key-secret: ${RAZORPAY_KEY_SECRET:placeholder_secret}
-  mock-mode: ${RAZORPAY_MOCK_MODE:true}
-
-cors:
-  allowed-origin: ${FRONTEND_ORIGIN:http://localhost:5173}

@@ -34,6 +34,7 @@ public class AdminOrderResponse {
                 .toList();
     }
 
+    @Getter
     public static class Item {
         private String productName;
         private int qty;

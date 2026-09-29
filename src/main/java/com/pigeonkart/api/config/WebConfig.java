@@ -11,8 +11,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${cors.allowed-origin}")
-    private String allowedOrigin;
+    @Value("${cors.allowed-origins}")
+    private String[] allowedOrigins;
 
     private final AdminAuthService adminAuthService;
 
@@ -23,7 +23,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins(allowedOrigin)
+                .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE")
                 .allowedHeaders("*");
     }
