@@ -2,22 +2,26 @@ package com.pigeonkart.api.config;
 
 import com.pigeonkart.api.service.AdminAuthInterceptor;
 import com.pigeonkart.api.service.AdminAuthService;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
+@ConfigurationProperties(prefix = "cors")
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${cors.allowed-origins}")
-    private String[] allowedOrigins;
+    private String[] allowedOrigins = {};
 
     private final AdminAuthService adminAuthService;
 
     public WebConfig(AdminAuthService adminAuthService) {
         this.adminAuthService = adminAuthService;
+    }
+
+    public void setAllowedOrigins(String[] allowedOrigins) {
+        this.allowedOrigins = allowedOrigins;
     }
 
     @Override
