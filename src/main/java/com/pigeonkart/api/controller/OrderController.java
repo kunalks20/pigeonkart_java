@@ -32,6 +32,6 @@ public class OrderController {
 
     @PostMapping("coupons/apply")
     public CouponResponse apply(@Valid @RequestBody CouponApplyRequest request) {
-        return new CouponResponse(orderService.requireActiveCoupon(request.getCode()));
+        return new CouponResponse(orderService.validateCouponForItems(request.getCode(), request.getItems()));
     }
 }

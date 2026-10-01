@@ -1,5 +1,6 @@
 package com.pigeonkart.api.service;
 
+import com.pigeonkart.api.dto.CouponApplyRequest;
 import com.pigeonkart.api.dto.OrderRequest;
 import com.pigeonkart.api.model.Coupon;
 import com.pigeonkart.api.model.CustomerOrder;
@@ -12,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 @Service
@@ -45,6 +48,7 @@ public class OrderService {
 
         int subtotal = 0;
         int discount = 0;
+        boolean hasEligibleCouponItem = false;
 
         for (OrderRequest.Item item : request.getItems()) {
             Product product = productRepository.findById(item.getProductId())
@@ -64,10 +68,16 @@ public class OrderService {
             subtotal+= product.getPrice() * item.getQty();
 
             if (coupon != null) {
+                hasEligibleCouponItem |= coupon.matches(product.getCategory(), product.getUnit());
                 int effectiveUnitPrice = effectiveUnitPrice(coupon, product);
                 discount += (product.getPrice() - effectiveUnitPrice) * item.getQty();
             }
         }
+
+        if (coupon != null && !hasEligibleCouponItem) {
+            throw new CouponNotApplicableException(couponEligibilityMessage(coupon));
+        }
+
         order.setSubtotalAmount(subtotal);
         order.setDiscountAmount(discount);
         order.setTotalAmount(subtotal - discount);
@@ -76,6 +86,11 @@ public class OrderService {
 
     public CustomerOrder getOrder(Long id) {
         return orderRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Order not found: " + id));
+    }
+
+    public CustomerOrder getOrderForUpdate(Long id) {
+        return orderRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new NoSuchElementException("Order not found: " + id));
     }
 
@@ -97,6 +112,36 @@ public class OrderService {
             throw new IllegalStateException("Coupon is no longer active: " + code);
         }
         return coupon;
+    }
+
+    public Coupon validateCouponForItems(String code, List<CouponApplyRequest.Item> items) {
+        Coupon coupon = requireActiveCoupon(code);
+        boolean hasEligibleItem = items.stream().anyMatch(item -> {
+            Product product = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new NoSuchElementException("Unknown product: " + item.getProductId()));
+            return coupon.matches(product.getCategory(), product.getUnit());
+        });
+
+        if (!hasEligibleItem) {
+            throw new CouponNotApplicableException(couponEligibilityMessage(coupon));
+        }
+        return coupon;
+    }
+
+    private String couponEligibilityMessage(Coupon coupon) {
+        List<String> requirements = new ArrayList<>();
+        if (coupon.getScopeCategory() != null) {
+            requirements.add(coupon.getScopeCategory() + " items");
+        }
+        if (coupon.getScopeUnitContains() != null && !coupon.getScopeUnitContains().isBlank()) {
+            requirements.add("products with a unit containing \"" + coupon.getScopeUnitContains() + "\"");
+        }
+
+        if (requirements.isEmpty()) {
+            return "Sorry, your cart doesn't have any items eligible for this coupon.";
+        }
+        return "Sorry, your cart doesn't have any eligible items. This coupon is only applicable to "
+                + String.join(" and ", requirements) + ".";
     }
 
     public int effectiveUnitPrice(Coupon coupon, Product product) {
