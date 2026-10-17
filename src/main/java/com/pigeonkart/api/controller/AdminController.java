@@ -32,7 +32,7 @@ public class AdminController {
 
     @GetMapping("/orders")
     public List<AdminOrderResponse> getListOfOrders() {
-        return orderRepository.findAll().stream()
+        return orderRepository.findByStatusNotIn(List.of(OrderStatus.PENDING_PAYMENT, OrderStatus.FAILED)).stream()
                 .map(AdminOrderResponse::new)
                 .toList();
     }
@@ -41,7 +41,11 @@ public class AdminController {
     public AdminOrderResponse updateStatus(@PathVariable Long id, @Valid @RequestBody AdminUpdate request) {
         CustomerOrder order = orderRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Order not found: " + id));
-        order.setStatus(OrderStatus.valueOf(request.getStatus()));
+        OrderStatus status = OrderStatus.valueOf(request.getStatus());
+        if (status == OrderStatus.FAILED) {
+            throw new IllegalStateException("Failed payments cannot be recorded as orders");
+        }
+        order.setStatus(status);
         if (request.getRemarks() != null) {
             order.setRemarks(request.getRemarks());
         }

@@ -5,6 +5,7 @@ import com.pigeonkart.api.dto.OrderRequest;
 import com.pigeonkart.api.model.Coupon;
 import com.pigeonkart.api.model.CustomerOrder;
 import com.pigeonkart.api.model.OrderItem;
+import com.pigeonkart.api.model.OrderStatus;
 import com.pigeonkart.api.model.Product;
 import com.pigeonkart.api.repository.CouponRepo;
 import com.pigeonkart.api.repository.OrderRepository;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,13 +30,8 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final CouponRepo couponRepo;
-    /**
-     * Creates an order in PENDING_PAYMENT status. Stock is validated here but only
-     * decremented once payment is verified (see PaymentService.verify), so an
-     * abandoned checkout doesn't permanently lock stock.
-     */
-    @Transactional
-    public CustomerOrder createOrder(OrderRequest request) {
+
+    public CustomerOrder prepareOrder(OrderRequest request) {
         CustomerOrder order = new CustomerOrder(
                 request.getCustomer().getName(),
                 request.getCustomer().getPhone(),
@@ -65,7 +62,7 @@ public class OrderService {
             }
 
             order.addItem(new OrderItem(product.getId(), product.getName(), product.getPrice(), item.getQty()));
-            subtotal+= product.getPrice() * item.getQty();
+            subtotal += product.getPrice() * item.getQty();
 
             if (coupon != null) {
                 hasEligibleCouponItem |= coupon.matches(product.getCategory(), product.getUnit());
@@ -81,7 +78,7 @@ public class OrderService {
         order.setSubtotalAmount(subtotal);
         order.setDiscountAmount(discount);
         order.setTotalAmount(subtotal - discount);
-        return orderRepository.save(order);
+        return order;
     }
 
     public CustomerOrder getOrder(Long id) {
@@ -89,20 +86,19 @@ public class OrderService {
                 .orElseThrow(() -> new NoSuchElementException("Order not found: " + id));
     }
 
-    public CustomerOrder getOrderForUpdate(Long id) {
-        return orderRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new NoSuchElementException("Order not found: " + id));
+    public Optional<CustomerOrder> findByPaymentId(String paymentId) {
+        return orderRepository.findByRazorpayPaymentId(paymentId);
     }
 
     @Transactional
-    public void applyStockAndSave(CustomerOrder order) {
+    public CustomerOrder savePaidOrder(CustomerOrder order) {
         for (OrderItem item : order.getItems()) {
-            Product product = productRepository.findById(item.getProductId())
+            Product product = productRepository.findByIdForUpdate(item.getProductId())
                     .orElseThrow(() -> new NoSuchElementException("Unknown product: " + item.getProductId()));
             product.decreaseStock(item.getQty());
-            productRepository.save(product);
         }
-        orderRepository.save(order);
+        order.setStatus(OrderStatus.PAID);
+        return orderRepository.save(order);
     }
 
     public Coupon requireActiveCoupon(String code) {

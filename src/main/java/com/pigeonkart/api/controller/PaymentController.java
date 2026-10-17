@@ -1,12 +1,17 @@
 package com.pigeonkart.api.controller;
 
+import com.pigeonkart.api.dto.OrderRequest;
 import com.pigeonkart.api.dto.PaymentOrderResponse;
 import com.pigeonkart.api.dto.PaymentVerifyRequest;
 import com.pigeonkart.api.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/payments/razorpay")
@@ -15,14 +20,13 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    @PostMapping("/order/{orderId}")
-    public PaymentOrderResponse createOrder(@PathVariable Long orderId) throws Exception {
-        return paymentService.createPaymentOrder(orderId);
+    @PostMapping("/order")
+    public PaymentOrderResponse createOrder(@Valid @RequestBody OrderRequest request) throws Exception {
+        return paymentService.createPaymentOrder(request);
     }
 
     @PostMapping("/verify")
-    public ResponseEntity<Void> verify(@Valid @RequestBody PaymentVerifyRequest request) throws Exception {
-        paymentService.verify(request);
-        return ResponseEntity.ok().build();
+    public Map<String, Long> verify(@Valid @RequestBody PaymentVerifyRequest request) throws Exception {
+        return Map.of("orderId", paymentService.verify(request));
     }
 }

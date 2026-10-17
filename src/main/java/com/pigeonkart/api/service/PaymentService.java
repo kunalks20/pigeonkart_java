@@ -2,21 +2,31 @@ package com.pigeonkart.api.service;
 
 import com.pigeonkart.api.dto.PaymentOrderResponse;
 import com.pigeonkart.api.dto.PaymentVerifyRequest;
+import com.pigeonkart.api.dto.OrderRequest;
 import com.pigeonkart.api.model.CustomerOrder;
-import com.pigeonkart.api.model.OrderStatus;
+import com.pigeonkart.api.model.OrderItem;
 import com.razorpay.Order;
+import com.razorpay.Payment;
 import com.razorpay.RazorpayException;
 import com.razorpay.RazorpayClient;
 import com.razorpay.Utils;
 import lombok.RequiredArgsConstructor;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 @Service
 @RequiredArgsConstructor
@@ -33,79 +43,53 @@ public class PaymentService {
     @Value("${razorpay.mock-mode}")
     private boolean mockMode;
 
-    /**
-     * Opens a Razorpay order for the given internal order id, restricted to UPI.
-     * In mock mode (no real Razorpay account yet) this returns a fake order id
-     * so the frontend flow can be built/demoed end to end.
-     */
-    @Transactional
-    public PaymentOrderResponse createPaymentOrder(Long orderId) throws Exception {
-        CustomerOrder order = orderService.getOrderForUpdate(orderId);
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not awaiting payment");
-        }
-
+    public PaymentOrderResponse createPaymentOrder(OrderRequest request) throws Exception {
+        CustomerOrder order = orderService.prepareOrder(request);
         long amountInPaise = order.getTotalAmount() * 100L;
         if (amountInPaise < 100) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment amount must be at least 100 paise");
         }
 
-        if (order.getRazorpayOrderId() != null && !order.getRazorpayOrderId().isBlank()) {
-            return new PaymentOrderResponse(order.getRazorpayOrderId(), amountInPaise, "INR", keyId);
-        }
-
+        String razorpayOrderId;
         if (mockMode) {
-            String fakeRazorpayOrderId = "order_mock_" + UUID.randomUUID().toString().substring(0, 12);
-            order.setRazorpayOrderId(fakeRazorpayOrderId);
-            return new PaymentOrderResponse(fakeRazorpayOrderId, amountInPaise, "INR", keyId);
+            razorpayOrderId = "order_mock_" + UUID.randomUUID().toString().substring(0, 12);
+        } else {
+            RazorpayClient client = new RazorpayClient(keyId, keySecret);
+            JSONObject options = new JSONObject();
+            options.put("amount", amountInPaise);
+            options.put("currency", "INR");
+            options.put("receipt", UUID.randomUUID().toString());
+            Order rpOrder;
+            try {
+                rpOrder = client.orders.create(options);
+            } catch (RazorpayException ex) {
+                HttpStatus status = ex.getStatusCode() == HttpStatus.UNAUTHORIZED.value()
+                        ? HttpStatus.UNAUTHORIZED
+                        : HttpStatus.INTERNAL_SERVER_ERROR;
+                throw new ResponseStatusException(status, "Could not create Razorpay order", ex);
+            }
+            razorpayOrderId = rpOrder.get("id");
         }
 
-        RazorpayClient client = new RazorpayClient(keyId, keySecret);
-        JSONObject options = new JSONObject();
-        options.put("amount", amountInPaise);
-        options.put("currency", "INR");
-        options.put("receipt", order.getId().toString());
-        // Method restriction to UPI is applied on the frontend checkout config
-        // (see method: { upi: true } in Checkout.jsx); Razorpay orders themselves
-        // are method-agnostic.
-        Order rpOrder;
-        try {
-            rpOrder = client.orders.create(options);
-        } catch (RazorpayException ex) {
-            HttpStatus status = ex.getStatusCode() == HttpStatus.UNAUTHORIZED.value()
-                    ? HttpStatus.UNAUTHORIZED
-                    : HttpStatus.INTERNAL_SERVER_ERROR;
-            throw new ResponseStatusException(status, "Could not create Razorpay order", ex);
-        }
-
-        order.setRazorpayOrderId(rpOrder.get("id"));
-        return new PaymentOrderResponse(rpOrder.get("id"), amountInPaise, "INR", keyId);
+        String checkoutToken = createCheckoutToken(order, razorpayOrderId);
+        return new PaymentOrderResponse(razorpayOrderId, amountInPaise, "INR", keyId, checkoutToken);
     }
 
-    /**
-     * Verifies the payment signature Razorpay's checkout.js returns, then marks
-     * the order paid and decrements stock. Throws if verification fails.
-     */
-    @Transactional
-    public void verify(PaymentVerifyRequest req) throws Exception {
-        CustomerOrder order = orderService.getOrderForUpdate(req.getOrderId());
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not awaiting payment");
-        }
-        if (order.getRazorpayOrderId() == null
-                || !order.getRazorpayOrderId().equals(req.getRazorpay_order_id())) {
+    public Long verify(PaymentVerifyRequest req) throws Exception {
+        JSONObject checkout = readCheckoutToken(req.getCheckoutToken());
+        if (!checkout.getString("razorpayOrderId").equals(req.getRazorpayOrderId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Razorpay order does not match this order");
         }
 
         boolean valid;
         if (mockMode) {
             // Demo mode: accept any payment id so the flow can be tested without keys.
-            valid = req.getRazorpay_payment_id() != null && !req.getRazorpay_payment_id().isBlank();
+            valid = req.getRazorpayPaymentId() != null && !req.getRazorpayPaymentId().isBlank();
         } else {
             JSONObject attributes = new JSONObject();
-            attributes.put("razorpay_order_id", req.getRazorpay_order_id());
-            attributes.put("razorpay_payment_id", req.getRazorpay_payment_id());
-            attributes.put("razorpay_signature", req.getRazorpay_signature());
+            attributes.put("razorpay_order_id", req.getRazorpayOrderId());
+            attributes.put("razorpay_payment_id", req.getRazorpayPaymentId());
+            attributes.put("razorpay_signature", req.getRazorpaySignature());
             valid = Utils.verifyPaymentSignature(attributes, keySecret);
         }
 
@@ -113,8 +97,100 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment signature verification failed");
         }
 
-        order.setRazorpayPaymentId(req.getRazorpay_payment_id());
-        order.setStatus(OrderStatus.PAID);
-        orderService.applyStockAndSave(order);
+        int totalAmount = checkout.getInt("totalAmount");
+        if (!mockMode) {
+            RazorpayClient client = new RazorpayClient(keyId, keySecret);
+            Payment payment = client.payments.fetch(req.getRazorpayPaymentId());
+            if (!req.getRazorpayOrderId().equals(payment.get("order_id"))
+                    || !"captured".equalsIgnoreCase(payment.get("status"))
+                    || !"INR".equalsIgnoreCase(payment.get("currency"))
+                    || ((Number) payment.get("amount")).longValue() != totalAmount * 100L) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payment was not captured for this order");
+            }
+        }
+
+        var existingOrder = orderService.findByPaymentId(req.getRazorpayPaymentId());
+        if (existingOrder.isPresent()) {
+            return existingOrder.get().getId();
+        }
+
+        CustomerOrder order = orderFromCheckout(checkout);
+        order.setRazorpayOrderId(req.getRazorpayOrderId());
+        order.setRazorpayPaymentId(req.getRazorpayPaymentId());
+        return orderService.savePaidOrder(order).getId();
+    }
+
+    private String createCheckoutToken(CustomerOrder order, String razorpayOrderId)
+            throws GeneralSecurityException {
+        JSONObject checkout = new JSONObject();
+        checkout.put("razorpayOrderId", razorpayOrderId);
+        checkout.put("expiresAt", Instant.now().plusSeconds(7200).getEpochSecond());
+        checkout.put("customerName", order.getCustomerName());
+        checkout.put("customerPhone", order.getCustomerPhone());
+        checkout.put("customerAddress", order.getCustomerAddress());
+        checkout.put("subtotalAmount", order.getSubtotalAmount());
+        checkout.put("discountAmount", order.getDiscountAmount());
+        checkout.put("totalAmount", order.getTotalAmount());
+        JSONArray items = new JSONArray();
+        for (OrderItem item : order.getItems()) {
+            JSONObject itemData = new JSONObject();
+            itemData.put("productId", item.getProductId());
+            itemData.put("productName", item.getProductName());
+            itemData.put("unitPrice", item.getUnitPrice());
+            itemData.put("qty", item.getQty());
+            items.put(itemData);
+        }
+        checkout.put("items", items);
+
+        String payload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(checkout.toString().getBytes(StandardCharsets.UTF_8));
+        return payload + "." + sign(payload);
+    }
+
+    private JSONObject readCheckoutToken(String token) throws GeneralSecurityException {
+        String[] parts = token.split("\\.", -1);
+        if (parts.length != 2 || !MessageDigest.isEqual(
+                sign(parts[0]).getBytes(StandardCharsets.US_ASCII),
+                parts[1].getBytes(StandardCharsets.US_ASCII))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid checkout token");
+        }
+
+        try {
+            JSONObject checkout = new JSONObject(new String(
+                    Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8));
+            if (checkout.getLong("expiresAt") <= Instant.now().getEpochSecond()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checkout session has expired");
+            }
+            return checkout;
+        } catch (org.json.JSONException | IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid checkout token", ex);
+        }
+    }
+
+    private String sign(String payload) throws GeneralSecurityException {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(keySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(mac.doFinal(payload.getBytes(StandardCharsets.US_ASCII)));
+    }
+
+    private CustomerOrder orderFromCheckout(JSONObject checkout) {
+        CustomerOrder order = new CustomerOrder(
+                checkout.getString("customerName"),
+                checkout.getString("customerPhone"),
+                checkout.getString("customerAddress"));
+        order.setSubtotalAmount(checkout.getInt("subtotalAmount"));
+        order.setDiscountAmount(checkout.getInt("discountAmount"));
+        order.setTotalAmount(checkout.getInt("totalAmount"));
+        JSONArray items = checkout.getJSONArray("items");
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.getJSONObject(i);
+            order.addItem(new OrderItem(
+                    item.getLong("productId"),
+                    item.getString("productName"),
+                    item.getInt("unitPrice"),
+                    item.getInt("qty")));
+        }
+        return order;
     }
 }

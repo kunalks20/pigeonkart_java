@@ -3,6 +3,8 @@ package com.pigeonkart.api.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,6 +16,7 @@ import java.util.List;
 public class OrderRequest {
 
     @Valid
+    @NotNull
     private Customer customer;
 
     @NotEmpty
@@ -23,17 +26,21 @@ public class OrderRequest {
 
     @Getter
     public static class Customer {
-        @NotBlank private String name;
+        @NotBlank
+        private String name;
         @NotBlank
         @Pattern(regexp = "^[6-9]\\d{9}$", message = "Phone must be a 10-digit mobile number")
         private String phone;
-        @NotBlank private String address;
+        @NotBlank
+        private String address;
     }
 
     @Getter
     @Setter
     public static class Item {
-        @NotBlank private Long productId;
+        @NotNull
+        private Long productId;
+        @Min(1)
         private int qty;
     }
 }

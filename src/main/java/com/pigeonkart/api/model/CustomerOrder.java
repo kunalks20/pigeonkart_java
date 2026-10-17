@@ -28,6 +28,7 @@ public class CustomerOrder {
     private OrderStatus status = OrderStatus.PENDING_PAYMENT;
 
     private String razorpayOrderId;
+    @Column(unique = true)
     private String razorpayPaymentId;
     private int subtotalAmount;
     private int discountAmount;

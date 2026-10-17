@@ -1,16 +1,15 @@
 package com.pigeonkart.api.repository;
 
 import com.pigeonkart.api.model.CustomerOrder;
-import jakarta.persistence.LockModeType;
+import com.pigeonkart.api.model.OrderStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<CustomerOrder, Long> {
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select o from CustomerOrder o where o.id = :id")
-    Optional<CustomerOrder> findByIdForUpdate(@Param("id") Long id);
+    Optional<CustomerOrder> findByRazorpayPaymentId(String razorpayPaymentId);
+
+    List<CustomerOrder> findByStatusNotIn(Collection<OrderStatus> statuses);
 }
